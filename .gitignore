@@ -1,0 +1,6 @@
+takeout-*
+jarvis_brain_db/
+jarvis_memory.csv
+__pycache__/
+jarvis-ui/node_modules/
+jarvis-ui/dist/
