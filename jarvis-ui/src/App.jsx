@@ -26,7 +26,7 @@ function App() {
     setResponseText("กำลังประมวลผล...");
 
     try {
-      const backendUrl = 'http://localhost:8001/chat';
+      const backendUrl = 'http://https://jarvis-project-jtj9.onrender.com/chat';
       const response = await fetch(backendUrl, {
         method: 'POST',
         headers: {
