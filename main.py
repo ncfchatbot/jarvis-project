@@ -1,24 +1,12 @@
 import os
-import sys
-
-# [สำคัญ] บังคับให้ระบบ Windows ใช้ภาษา UTF-8 ป้องกัน Error ภาษาไทย
-os.environ["PYTHONUTF8"] = "1"
-os.environ["PYTHONIOENCODING"] = "utf-8"
-
-import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from google import genai 
-
-# ป้องกัน Terminal แสดงผลภาษาไทยเป็นตัวหนังสือต่างดาว
-if sys.stdout.encoding != 'utf-8':
-    sys.stdout.reconfigure(encoding='utf-8')
+from google import genai
 
 app = FastAPI()
 
-# เปิดทางให้หน้าเว็บคุยกับหลังบ้าน
+# ตั้งค่า CORS อนุญาตให้หน้าเว็บทุกโดเมนติดต่อเข้ามาได้
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -36,10 +24,15 @@ async def chat_with_jarvis(request: ChatRequest):
     print(f"เจ้านายสั่งว่า: {user_message}")
 
     try:
-        # เชื่อมต่อสมอง Gemini (อย่าลืมเปลี่ยน API Key ของเจ้านายตรงนี้นะครับ)
-        client = genai.Client(api_key="AIzaSyDcVVeVjfVjtjumwgEjZvux2hgUgXyZRQE")
+        # ดึง API Key จากระบบ Environment Variable ที่ตั้งค่าไว้ใน Render
+        api_key = os.environ.get("GEMINI_API_KEY")
+        if not api_key:
+            raise HTTPException(status_code=500, detail="API Key not found in environment variables")
+
+        # เชื่อมต่อสมอง Gemini ด้วยคีย์ที่ถูกต้อง
+        client = genai.Client(api_key=api_key)
         
-        sys_instruct = "You are Jarvis, an advanced voice-enabled AI assistant. You MUST strictly reply in the Thai language, provide direct answers with real-time data when asked, be concise, and always call the user 'เจ้านาย'. Never say you cannot speak; you are fully capable of voice communication."
+        sys_instruct = "You are Jarvis, an advanced voice-enabled AI assistant. You MUST strictly reply in Thai."
 
         # ส่งคำถามไปให้ Gemini ประมวลผล พร้อมเปิดเครื่องมือค้นหา Google Search ในตัว
         response = client.models.generate_content(
@@ -47,20 +40,16 @@ async def chat_with_jarvis(request: ChatRequest):
             contents=user_message,
             config=dict(
                 system_instruction=sys_instruct,
-                tools=[{"google_search": {}}]  # <--- คำสั่งบังคับให้ไปค้นข้อมูลสดๆ จากอินเทอร์เน็ต
+                tools=[{"google_search": {} }]
             )
         )
-        
-        reply_message = response.text
-        return {"response": reply_message}
-        
+
+        return {"response": response.text}
+
     except Exception as e:
-        print(f"เกิดข้อผิดพลาดในระบบ AI: {e}")
+        print(f"เกิดข้อผิดพลาดในระบบ AI: {str(e)}")
         return {"response": "ขออภัยครับเจ้านาย ระบบประมวลผลหลังบ้านขัดข้องครับ"}
 
-ui_path = "jarvis-ui/dist"
-if os.path.exists(ui_path):
-    app.mount("/", StaticFiles(directory=ui_path, html=True), name="ui")
-
-if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8001, reload=True)
+@app.get("/")
+async def root():
+    return {"status": "Jarvis Backend is running online!"}
