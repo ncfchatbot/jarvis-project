@@ -36,7 +36,7 @@ async def chat_with_jarvis(request: ChatRequest):
 
         # ส่งคำถามไปให้ Gemini ประมวลผล พร้อมเปิดเครื่องมือค้นหา Google Search ในตัว
         response = client.models.generate_content(
-            model='gemini-2.5-flash',
+            model='gemini-1.5-flash',
             contents=user_message,
             config=dict(
                 system_instruction=sys_instruct,
