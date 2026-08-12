@@ -30,7 +30,7 @@ async def chat_with_jarvis(request: ChatRequest):
         return {"response": "Error: ไม่พบ API Key ในระบบหลังบ้านครับ"}
 
     # ลับเฉพาะ: ยิงคำสั่งตรงเข้าเซิร์ฟเวอร์ AI ของ Google โดยไม่ใช้ SDK
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
     
     # จัดเตรียมข้อมูลคำสั่ง
     payload = {
