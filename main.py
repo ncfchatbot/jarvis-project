@@ -1,13 +1,14 @@
 import os
+import json
+import urllib.request
+import urllib.error
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from google import genai
-from google.genai import types
 
 app = FastAPI()
 
-# ตั้งค่า CORS อนุญาตให้หน้าเว็บติดต่อเข้ามาได้
+# อนุญาตให้หน้าเว็บสีฟ้าเชื่อมต่อเข้ามา
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -24,36 +25,42 @@ async def chat_with_jarvis(request: ChatRequest):
     user_message = request.text
     print(f"เจ้านายสั่งว่า: {user_message}")
 
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        return {"response": "Error: ไม่พบ API Key ในระบบหลังบ้านครับ"}
+
+    # ลับเฉพาะ: ยิงคำสั่งตรงเข้าเซิร์ฟเวอร์ AI ของ Google โดยไม่ใช้ SDK
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+    
+    # จัดเตรียมข้อมูลคำสั่ง
+    payload = {
+        "systemInstruction": {
+            "parts": [{"text": "You are Jarvis, an advanced AI assistant. You MUST strictly reply in Thai."}]
+        },
+        "contents": [
+            {"role": "user", "parts": [{"text": user_message}]}
+        ]
+    }
+    
+    # แปลงข้อมูลเป็นรูปแบบที่เซิร์ฟเวอร์เข้าใจ
+    data = json.dumps(payload).encode('utf-8')
+    headers = {'Content-Type': 'application/json'}
+    req = urllib.request.Request(url, data=data, headers=headers)
+
     try:
-        # ดึง API Key
-        api_key = os.environ.get("GEMINI_API_KEY")
-        if not api_key:
-            return {"response": "Error: ไม่พบ API Key ในระบบหลังบ้านของ Render ครับ"}
-
-        # เชื่อมต่อด้วยไลบรารีตัวใหม่
-        client = genai.Client(api_key=api_key)
-        
-        # ตั้งค่าคำสั่งและการค้นหา Google
-        config = types.GenerateContentConfig(
-            system_instruction="You are Jarvis, an advanced AI assistant. You MUST strictly reply in Thai.",
-            tools=[{"google_search": {}}]
-        )
-
-        # เรียกใช้งานโมเดลรุ่นเสถียรที่สุด
-        response = client.models.generate_content(
-            model='gemini-1.0-pro',
-            contents=user_message,
-            config=config
-        )
-
-        return {"response": response.text}
-
+        # ส่งคำสั่งและรอรับข้อความตอบกลับ
+        with urllib.request.urlopen(req) as response:
+            result = json.loads(response.read().decode('utf-8'))
+            text_response = result['candidates'][0]['content']['parts'][0]['text']
+            return {"response": text_response}
+            
+    except urllib.error.HTTPError as e:
+        # ถ้าพัง คราวนี้จะฟ้อง Error ตรงๆ จากฝั่ง Google 
+        error_body = e.read().decode('utf-8')
+        return {"response": f"เซิร์ฟเวอร์ Google ปฏิเสธครับ: {e.code} - {error_body}"}
     except Exception as e:
-        # ถ้าพัง จะส่งข้อความ Error ของระบบไปแสดงที่หน้าจอให้เห็นกันชัดๆ เลย
-        error_msg = str(e)
-        print(f"Error: {error_msg}")
-        return {"response": f"ระบบขัดข้องครับเจ้านาย สาเหตุคือ: {error_msg}"}
+        return {"response": f"ระบบขัดข้องภายในครับ: {str(e)}"}
 
 @app.get("/")
 async def root():
-    return {"status": "Jarvis Backend is running online!"}
+    return {"status": "Jarvis Direct API Backend is running online!"}
