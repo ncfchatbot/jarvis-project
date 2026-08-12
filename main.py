@@ -1,12 +1,13 @@
 import os
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from google import genai
+from google.genai import types
 
 app = FastAPI()
 
-# ตั้งค่า CORS อนุญาตให้หน้าเว็บทุกโดเมนติดต่อเข้ามาได้
+# ตั้งค่า CORS อนุญาตให้หน้าเว็บติดต่อเข้ามาได้
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -24,31 +25,34 @@ async def chat_with_jarvis(request: ChatRequest):
     print(f"เจ้านายสั่งว่า: {user_message}")
 
     try:
-        # ดึง API Key จากระบบ Environment Variable ที่ตั้งค่าไว้ใน Render
+        # ดึง API Key
         api_key = os.environ.get("GEMINI_API_KEY")
         if not api_key:
-            raise HTTPException(status_code=500, detail="API Key not found in environment variables")
+            return {"response": "Error: ไม่พบ API Key ในระบบหลังบ้านของ Render ครับ"}
 
-        # เชื่อมต่อสมอง Gemini ด้วยคีย์ที่ถูกต้อง
+        # เชื่อมต่อด้วยไลบรารีตัวใหม่
         client = genai.Client(api_key=api_key)
         
-        sys_instruct = "You are Jarvis, an advanced voice-enabled AI assistant. You MUST strictly reply in Thai."
+        # ตั้งค่าคำสั่งและการค้นหา Google
+        config = types.GenerateContentConfig(
+            system_instruction="You are Jarvis, an advanced AI assistant. You MUST strictly reply in Thai.",
+            tools=[{"google_search": {}}]
+        )
 
-        # ส่งคำถามไปให้ Gemini ประมวลผล พร้อมเปิดเครื่องมือค้นหา Google Search ในตัว
+        # เรียกใช้งานโมเดลรุ่นเสถียรที่สุด
         response = client.models.generate_content(
             model='gemini-1.5-flash',
             contents=user_message,
-            config=dict(
-                system_instruction=sys_instruct,
-                tools=[{"google_search": {} }]
-            )
+            config=config
         )
 
         return {"response": response.text}
 
     except Exception as e:
-        print(f"เกิดข้อผิดพลาดในระบบ AI: {str(e)}")
-        return {"response": "ขออภัยครับเจ้านาย ระบบประมวลผลหลังบ้านขัดข้องครับ"}
+        # ถ้าพัง จะส่งข้อความ Error ของระบบไปแสดงที่หน้าจอให้เห็นกันชัดๆ เลย
+        error_msg = str(e)
+        print(f"Error: {error_msg}")
+        return {"response": f"ระบบขัดข้องครับเจ้านาย สาเหตุคือ: {error_msg}"}
 
 @app.get("/")
 async def root():
