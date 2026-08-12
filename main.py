@@ -41,7 +41,7 @@ async def chat_with_jarvis(request: ChatRequest):
 
         # เรียกใช้งานโมเดลรุ่นเสถียรที่สุด
         response = client.models.generate_content(
-            model='gemini-1.5-flash-latest',
+            model='gemini-1.5-flash',
             contents=user_message,
             config=config
         )
